@@ -1,4 +1,6 @@
 # Silentis AI
+
+<img src="https://raw.githubusercontent.com/Silentisai/Silentis/main/SilentisLogo.png" alt="Silentis AI Banner" width="800"/>
 **Open Source Python Plugin**  
 **MIT License | Version 1.0**  
 
