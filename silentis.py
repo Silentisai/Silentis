@@ -12,7 +12,7 @@ class ConfigManager:
         self.app_path = Path(__file__).parent
         self.config_file = self.app_path / "config.json"
         self.supported_models = {
-            1: {"name": "Reasoner v1", "ram_required": 8, "url": "https://huggingface.co/NousResearch/Reasoner-v1-GGUF/resolve/main/reasoner-v1-q4_k_m.gguf?download=true"},
+            1: {"name": "Reasoner v1", "ram_required": 8, "url": "https://huggingface.co/Qwen/Qwen2.5-Coder-7B-Instruct-GGUF/resolve/main/qwen2.5-coder-7b-instruct-q4_0.gguf?download=true"},
             2: {"name": "Llama 3 8B Instruct", "ram_required": 8, "url": "https://huggingface.co/QuantFactory/Meta-Llama-3-8B-Instruct-GGUF/resolve/main/Meta-Llama-3-8B-Instruct.Q4_K_M.gguf?download=true"},
             3: {"name": "DeepSeek-R1-Distill-Qwen-7B", "ram_required": 8, "url": "https://huggingface.co/unsloth/DeepSeek-R1-Distill-Qwen-7B-GGUF/resolve/main/DeepSeek-R1-Distill-Qwen-7B-Q4_K_M.gguf?download=true"},
             4: {"name": "Phi-3 Mini Instruct", "ram_required": 4, "url": "https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-gguf/resolve/main/Phi-3-mini-4k-instruct-q4.gguf?download=true"}
