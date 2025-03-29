@@ -1,4 +1,5 @@
-# Silentis AI - Open Source Python Plugin  
+# Silentis AI
+**Open Source Python Plugin**  
 **MIT License | Version 1.0**  
 
 A flexible AI plugin system for interacting with multiple large language models, featuring:  
