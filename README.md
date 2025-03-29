@@ -82,4 +82,4 @@ Modify `config.json` or use in-app settings (option 10):
 - Model weights from [HuggingFace](https://huggingface.co)  
 - Inspired by [llama-cpp-python](https://github.com/abetlen/llama-cpp-python)  
 
-> **Note**: Models require specific hardware configurations. Phi-3 works on 4GB RAM systems, while others require 8GB+. [[1]][[5]][[7]]  
+> **Note**: Models require specific hardware configurations. Phi-3 works on 4GB RAM systems, while others require 8GB+.
