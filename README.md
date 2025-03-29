@@ -1,7 +1,7 @@
 # Silentis AI
 
 <p align="center">
-  <img src="https://github.com/Silentisai/Silentis/blob/main/SilentisLogo.png?raw=true">
+  <img src="https://silentis.ai/SilentisAiGit.jpg?raw=true">
 </p>
 
 **Open Source Python Plugin**  
