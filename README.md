@@ -1,10 +1,10 @@
-# Silentis AI
+# Silentis AI - Core
 
 <p align="center">
   <img src="https://silentis.ai/SilentisAiGit.png?raw=true">
 </p>
 
-**Open Source Python Plugin**  
+**Silentis Open Source Core Python Plugin**  
 **MIT License | Version 1.0**  
 
 A flexible AI plugin system for interacting with multiple large language models, featuring:  
