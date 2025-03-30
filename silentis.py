@@ -5,7 +5,7 @@ import json
 import requests
 from llama_cpp import Llama
 import psutil
-import time
+
 
 class ConfigManager:
     def __init__(self):
@@ -21,7 +21,8 @@ class ConfigManager:
             "system_prompt": "You are Silentis, a helpful AI assistant. Answer briefly and accurately.",
             "model_params": {"temp": 0.7, "max_tokens": 50, "top_p": 0.9},
             "use_gpu": False,
-            "selected_model": None
+            "selected_model": None,
+            "show_welcome": True  # New key for toggling welcome message
         }
 
     def load_config(self):
@@ -41,6 +42,7 @@ class ConfigManager:
             print("Configuration saved successfully.")
         except Exception as e:
             print(f"Failed to save config: {str(e)}")
+
 
 class AICore:
     def __init__(self, model_path, config):
@@ -86,8 +88,8 @@ class AICore:
 
     def generate_response(self, prompt):
         self.chat_history.append({"role": "user", "content": prompt})
-        full_prompt = "\n".join([f"<|system|>{entry['content']}\n" if entry['role'] == 'system' 
-                                 else f"<|user|>{entry['content']}\n" 
+        full_prompt = "\n".join([f"<|system|>{entry['content']}\n" if entry['role'] == 'system'
+                                 else f"<|user|>{entry['content']}\n"
                                  for entry in self.chat_history]) + "\n<|assistant|>"
         try:
             response = self.model(
@@ -107,6 +109,7 @@ class AICore:
     def __del__(self):
         if self.model:
             self.model = None
+
 
 class Silentis:
     def __init__(self):
@@ -163,16 +166,20 @@ class Silentis:
         print(f"Current settings: Temp={self.config['model_params']['temp']}, "
               f"Max Tokens={self.config['model_params']['max_tokens']}, "
               f"Top-P={self.config['model_params']['top_p']}, "
-              f"GPU={'Enabled' if self.config['use_gpu'] else 'Disabled'}")
+              f"GPU={'Enabled' if self.config['use_gpu'] else 'Disabled'}, "
+              f"Show Welcome={'Enabled' if self.config['show_welcome'] else 'Disabled'}")
         try:
             temp = self._get_valid_input("Enter Temperature (0-1, default 0.7): ", float, 0.0, 1.0)
             max_tokens = self._get_valid_input("Enter Max Tokens (1-1000, default 50): ", int, 1, 1000)
             top_p = self._get_valid_input("Enter Top-P (0-1, default 0.9): ", float, 0.0, 1.0)
             use_gpu = input("Enable GPU? (y/n, default No): ").lower() in ['y', 'yes']
+            show_welcome = input("Show Welcome Message? (y/n, default Yes): ").lower() not in ['n', 'no']
+
             self.config['model_params']['temp'] = temp
             self.config['model_params']['max_tokens'] = max_tokens
             self.config['model_params']['top_p'] = top_p
             self.config['use_gpu'] = use_gpu
+            self.config['show_welcome'] = show_welcome  # Save the new setting
             self.cfg.save_config(self.config)
             print("Settings updated. Restart model for GPU changes to take effect.")
         except Exception as e:
@@ -198,40 +205,6 @@ class Silentis:
 \ \___  \  \ \ \  \ \ \____  \ \  __\   \ \ \-.  \  \/_/\ \/ \ \ \  \ \___  \  
  \/\_____\  \ \_\  \ \_____\  \ \_____\  \ \_\\"\_\    \ \_\  \ \_\  \/\_____\ 
   \/_____/   \/_/   \/_____/   \/_____/   \/_/ \/_/     \/_/   \/_/   \/_____/ 
-                                                                               
-        """)
-        print("Silentis AI Plugin")
-        print("MIT License | Version 1.0")
-        print("Documentation: https://silentis.ai/docs\n")
-    def run(self):
-        self._show_welcome()
-        
-        while True:
-            self._show_model_list()
-            print("10: Configure model settings")
-            print("0: Exit")
-            choice = input("Enter your choice: ").strip()
-            
-            if choice == '0':
-                print("Exiting Silentis AI...")
-                break
-            elif choice == '10':
-                self.update_model_settings()
-            elif choice in ['1', '2', '3', '4']:
-                self.load_model(int(choice))
-                if self.ai:
-                    self.start_chat()
-            else:
-                print("Invalid choice. Please try again.")
-
-    def _show_welcome(self):
-        print(r"""
- ______     __     __         ______     __   __     ______   __     ______    
-/\  ___\   /\ \   /\ \       /\  ___\   /\ "-.\ \   /\__  _\ /\ \   /\  ___\   
-\ \___  \  \ \ \  \ \ \____  \ \  __\   \ \ \-.  \  \/_/\ \/ \ \ \  \ \___  \  
- \/\_____\  \ \_\  \ \_____\  \ \_____\  \ \_\\"\_\    \ \_\  \ \_\  \/\_____\ 
-  \/_____/   \/_/   \/_____/   \/_____/   \/_/ \/_/     \/_/   \/_/   \/_____/ 
-                                                                               
         """)
         print("Silentis AI - Python Plugin")
         print("Developed by: Silentis Team")
@@ -246,6 +219,26 @@ class Silentis:
         print("===========================================")
         print("Support our mission: https://springboard.pancakeswap.finance/bsc/token/0x8a87562947422db0eb3070a5a1ac773c7a8d64e7")
         print("===========================================")
+
+    def run(self):
+        if self.config.get('show_welcome', True):  # Only show if enabled
+            self._show_welcome()
+        while True:
+            self._show_model_list()
+            print("10: Configure model settings")
+            print("0: Exit")
+            choice = input("Enter your choice: ").strip()
+            if choice == '0':
+                print("Exiting Silentis AI...")
+                break
+            elif choice == '10':
+                self.update_model_settings()
+            elif choice in ['1', '2', '3', '4']:
+                self.load_model(int(choice))
+                if self.ai:
+                    self.start_chat()
+            else:
+                print("Invalid choice. Please try again.")
 
     def _show_model_list(self):
         print("\n--- Available Models ---")
@@ -278,6 +271,7 @@ class Silentis:
             except Exception as e:
                 sys.stdout.write("\r" + " " * 20 + "\r")
                 print(f"Error: {str(e)}")
+
 
 if __name__ == "__main__":
     plugin = Silentis()
