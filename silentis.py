@@ -22,7 +22,8 @@ class ConfigManager:
             "model_params": {"temp": 0.7, "max_tokens": 50, "top_p": 0.9},
             "use_gpu": False,
             "selected_model": None,
-            "show_welcome": True  # New key for toggling welcome message
+            "show_welcome": True,
+            "disable_model_selection": False  # New key for disabling model selection
         }
 
     def load_config(self):
@@ -138,7 +139,12 @@ class Silentis:
                 return None
         return model_path
 
-    def load_model(self, model_number):
+    def load_model(self, model_number=None):
+        if model_number is None:
+            model_number = self.config.get('selected_model')
+            if model_number is None:
+                print("No default model selected. Please select a model first.")
+                return
         model_info = self.cfg.supported_models.get(model_number)
         if not model_info:
             print(f"Invalid model number. Choose from: {list(self.cfg.supported_models.keys())}")
@@ -167,19 +173,34 @@ class Silentis:
               f"Max Tokens={self.config['model_params']['max_tokens']}, "
               f"Top-P={self.config['model_params']['top_p']}, "
               f"GPU={'Enabled' if self.config['use_gpu'] else 'Disabled'}, "
-              f"Show Welcome={'Enabled' if self.config['show_welcome'] else 'Disabled'}")
+              f"Show Welcome={'Enabled' if self.config['show_welcome'] else 'Disabled'}, "
+              f"Disable Model Selection={'Enabled' if self.config['disable_model_selection'] else 'Disabled'}")
         try:
             temp = self._get_valid_input("Enter Temperature (0-1, default 0.7): ", float, 0.0, 1.0)
             max_tokens = self._get_valid_input("Enter Max Tokens (1-1000, default 50): ", int, 1, 1000)
             top_p = self._get_valid_input("Enter Top-P (0-1, default 0.9): ", float, 0.0, 1.0)
             use_gpu = input("Enable GPU? (y/n, default No): ").lower() in ['y', 'yes']
             show_welcome = input("Show Welcome Message? (y/n, default Yes): ").lower() not in ['n', 'no']
+            disable_model_selection = input("Disable Model Selection? (y/n, default No): ").lower() in ['y', 'yes']
+
+            if disable_model_selection:
+                # Prompt user to select a default model
+                print("Please select a default model:")
+                self._show_model_list()
+                default_model = input("Enter the number of the default model: ").strip()
+                if default_model.isdigit() and int(default_model) in self.cfg.supported_models:
+                    self.config['selected_model'] = int(default_model)
+                    print(f"Default model set to: {self.cfg.supported_models[int(default_model)]['name']}")
+                else:
+                    print("Invalid model number. Disabling model selection has been canceled.")
+                    disable_model_selection = False
 
             self.config['model_params']['temp'] = temp
             self.config['model_params']['max_tokens'] = max_tokens
             self.config['model_params']['top_p'] = top_p
             self.config['use_gpu'] = use_gpu
-            self.config['show_welcome'] = show_welcome  # Save the new setting
+            self.config['show_welcome'] = show_welcome
+            self.config['disable_model_selection'] = disable_model_selection  # Save the new setting
             self.cfg.save_config(self.config)
             print("Settings updated. Restart model for GPU changes to take effect.")
         except Exception as e:
@@ -223,22 +244,34 @@ class Silentis:
     def run(self):
         if self.config.get('show_welcome', True):  # Only show if enabled
             self._show_welcome()
-        while True:
-            self._show_model_list()
-            print("10: Configure model settings")
-            print("0: Exit")
-            choice = input("Enter your choice: ").strip()
-            if choice == '0':
-                print("Exiting Silentis AI...")
-                break
-            elif choice == '10':
-                self.update_model_settings()
-            elif choice in ['1', '2', '3', '4']:
-                self.load_model(int(choice))
+
+        if self.config.get('disable_model_selection', False):
+            # Skip model selection and load the default model
+            if self.config.get('selected_model') is None:
+                print("No default model selected. Please select a model first.")
+                self.config['disable_model_selection'] = False
+                self.cfg.save_config(self.config)
+            else:
+                self.load_model()
                 if self.ai:
                     self.start_chat()
-            else:
-                print("Invalid choice. Please try again.")
+        else:
+            while True:
+                self._show_model_list()
+                print("10: Configure model settings")
+                print("0: Exit")
+                choice = input("Enter your choice: ").strip()
+                if choice == '0':
+                    print("Exiting Silentis AI...")
+                    break
+                elif choice == '10':
+                    self.update_model_settings()
+                elif choice in ['1', '2', '3', '4']:
+                    self.load_model(int(choice))
+                    if self.ai:
+                        self.start_chat()
+                else:
+                    print("Invalid choice. Please try again.")
 
     def _show_model_list(self):
         print("\n--- Available Models ---")
