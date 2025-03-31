@@ -78,6 +78,8 @@ A flexible AI plugin system for interacting with multiple large language models,
 
 ---
 
+---
+
 ## Configuration
 
 Modify `config.json` or use the in-app settings menu (option `10`) to customize Silentis AI's behavior. All changes are saved automatically and persist across sessions.
@@ -116,18 +118,34 @@ Modify `config.json` or use the in-app settings menu (option `10`) to customize 
    - **Options**: `y` (Yes) / `n` (No)
    - **Default**: `Yes`
 
+#### 6. **Disable Model Selection (`Disable Model Selection`)**
+   - **Description**: Skip the model selection menu on startup and directly load a default model. If enabled, you must select a default model during configuration.
+   - **Options**: `y` (Yes) / `n` (No)
+   - **Default**: `No`
+
+   **Note**: When enabling this option, you will be prompted to select a default model from the available models. This ensures that the plugin always loads the same model without requiring manual selection each time.
+
 ### Example Interaction
 
 Here’s how the settings menu works:
 
 ```text
 --- Update Model Settings ---
-Current settings: Temp=0.7, Max Tokens=50, Top-P=0.9, GPU=Disabled, Show Welcome=Enabled
+Current settings: Temp=0.7, Max Tokens=50, Top-P=0.9, GPU=Disabled, Show Welcome=Enabled, Disable Model Selection=Disabled
 Enter Temperature (0-1, default 0.7): 
 Enter Max Tokens (1-1000, default 50): 100
 Enter Top-P (0-1, default 0.9): 
 Enable GPU? (y/n, default No): n
-Show Welcome Message? (y/n, default Yes): n
+Show Welcome Message? (y/n, default Yes): y
+Disable Model Selection? (y/n, default No): y
+Please select a default model:
+--- Available Models ---
+[1] Reasoner v1 (8GB RAM) - Advanced reasoning & logic
+[2] Llama 3 8B Instruct (8GB RAM) - Instruction execution specialist
+[3] DeepSeek-R1-Distill-Qwen-7B (8GB RAM) - Deep analysis & insights
+[4] Phi-3 Mini Instruct (4GB RAM) - Lightweight quick responses
+Enter the number of the default model: 1
+Default model set to: Reasoner v1
 Settings updated. Restart model for GPU changes to take effect.
 ```
 
