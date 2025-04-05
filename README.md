@@ -42,6 +42,14 @@ A flexible AI plugin system for interacting with multiple large language models,
 ---
 
 ## Installation
+Simple:
+Install from PyPi using pip:  
+   ```bash
+   pip install silentis-ai
+   ```
+Then go to the step 3.
+   
+Advanced:
 
 1. Clone the repository:  
    ```bash
