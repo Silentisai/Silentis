@@ -4,8 +4,8 @@
   <img src="https://silentis.ai/SilentisAiGit.png?raw=true">
 </p>
 
-**Silentis Open Source Core Python Plugin**  
-**MIT License | Version 1.0**  
+**Silentis Open-Source Core Python Plugin**  
+**MIT License | Plugin Version 1.2.2**  
 
 A flexible AI plugin system for interacting with multiple large language models, featuring:  
 ✅ **Multi-model support** (Reasoner, Llama, DeepSeek, Phi-3)  
@@ -268,10 +268,3 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ---
-
-### Notes for Deployment
-- Rename `silentis.html` to `index.html` in your project directory to match the provided code.
-- Update the GitHub repository URL in the README if it changes.
-- Ensure all links (e.g., `https://silentis.ai`) are valid or replace them with placeholders if not yet live.
-
-This README provides a comprehensive guide for users to set up and use Silentis AI via both the terminal and the web interface at `localhost:5000`. Let me know if you need further adjustments!
