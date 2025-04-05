@@ -1,5 +1,6 @@
+# run.py
 import sys
-from silentisai.silentis import Silentis
+from silentis import Silentis
 
 # Silentis AI - Python Plugin
 # Developed by: Silentis Team
@@ -17,7 +18,6 @@ from silentisai.silentis import Silentis
 def main():
     plugin = Silentis()
     plugin.run()
-
 
 if __name__ == "__main__":
     main()
