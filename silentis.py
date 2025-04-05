@@ -1,11 +1,15 @@
+# silentis.py
 import os
 import sys
 from pathlib import Path
 import json
 import requests
+from flask import Flask, request, jsonify, send_from_directory
+from flask_cors import CORS
 from llama_cpp import Llama
 import psutil
-
+from threading import Lock
+import threading
 
 class ConfigManager:
     def __init__(self):
@@ -19,11 +23,15 @@ class ConfigManager:
         }
         self.default_config = {
             "system_prompt": "You are Silentis, a helpful AI assistant. Answer briefly and accurately.",
+            "instructions": "",
             "model_params": {"temp": 0.7, "max_tokens": 50, "top_p": 0.9},
             "use_gpu": False,
             "selected_model": None,
             "show_welcome": True,
-            "disable_model_selection": False  # New key for disabling model selection
+            "disable_model_selection": False,
+            "api_enabled": False,
+            "api_host": "0.0.0.0",
+            "api_port": 5000
         }
 
     def load_config(self):
@@ -41,9 +49,10 @@ class ConfigManager:
             with open(self.config_file, "w") as f:
                 json.dump(config, f, indent=2)
             print("Configuration saved successfully.")
+            return True
         except Exception as e:
             print(f"Failed to save config: {str(e)}")
-
+            return False
 
 class AICore:
     def __init__(self, model_path, config):
@@ -51,6 +60,7 @@ class AICore:
         self.config = config
         self.model = None
         self.chat_history = []
+        self.lock = Lock()
         self.load_model()
         self.update_system_prompt()
 
@@ -61,18 +71,19 @@ class AICore:
             raise RuntimeError(f"Insufficient RAM: {model_info['name']} requires {required_ram}GB, only {available_ram:.1f}GB available")
 
     def update_system_prompt(self):
-        base_prompt = "You are Silentis, a helpful AI assistant."
+        base_prompt = self.config.get("system_prompt", "You are Silentis, a helpful AI assistant.")
+        instructions = self.config.get("instructions", "")
         model_name = Path(self.model_path).stem.lower()
         if "reasoner" in model_name:
-            self.system_prompt = f"{base_prompt} Focus on reasoning."
+            self.system_prompt = f"{base_prompt} Focus on reasoning.\n{instructions}"
         elif "llama" in model_name:
-            self.system_prompt = f"{base_prompt} Excel at instructions."
+            self.system_prompt = f"{base_prompt} Excel at instructions.\n{instructions}"
         elif "deepseek" in model_name:
-            self.system_prompt = f"{base_prompt} Provide deep insights."
+            self.system_prompt = f"{base_prompt} Provide deep insights.\n{instructions}"
         elif "phi-3" in model_name:
-            self.system_prompt = f"{base_prompt} Keep it quick and simple."
+            self.system_prompt = f"{base_prompt} Keep it quick and simple.\n{instructions}"
         else:
-            self.system_prompt = base_prompt
+            self.system_prompt = f"{base_prompt}\n{instructions}"
         self.chat_history = [{"role": "system", "content": self.system_prompt}]
 
     def load_model(self):
@@ -88,35 +99,39 @@ class AICore:
         )
 
     def generate_response(self, prompt):
-        self.chat_history.append({"role": "user", "content": prompt})
-        full_prompt = "\n".join([f"<|system|>{entry['content']}\n" if entry['role'] == 'system'
-                                 else f"<|user|>{entry['content']}\n"
-                                 for entry in self.chat_history]) + "\n<|assistant|>"
-        try:
-            response = self.model(
-                full_prompt,
-                temperature=self.config['model_params']['temp'],
-                max_tokens=self.config['model_params']['max_tokens'],
-                top_p=self.config['model_params']['top_p'],
-                echo=False,
-                stop=["\n"]
-            )
-            output = response['choices'][0]['text'].strip()
-            self.chat_history.append({"role": "assistant", "content": output})
-            return output
-        except Exception as e:
-            raise RuntimeError(f"Generation error: {str(e)}")
+        with self.lock:
+            self.chat_history.append({"role": "user", "content": prompt})
+            full_prompt = "\n".join([f"<|system|>{entry['content']}\n" if entry['role'] == 'system'
+                                   else f"<|user|>{entry['content']}\n"
+                                   for entry in self.chat_history]) + "\n<|assistant|>"
+            try:
+                response = self.model(
+                    full_prompt,
+                    temperature=self.config['model_params']['temp'],
+                    max_tokens=self.config['model_params']['max_tokens'],
+                    top_p=self.config['model_params']['top_p'],
+                    echo=False,
+                    stop=["\n"]
+                )
+                output = response['choices'][0]['text'].strip()
+                self.chat_history.append({"role": "assistant", "content": output})
+                return output
+            except Exception as e:
+                raise RuntimeError(f"Generation error: {str(e)}")
 
     def __del__(self):
         if self.model:
             self.model = None
-
 
 class Silentis:
     def __init__(self):
         self.cfg = ConfigManager()
         self.config = self.cfg.load_config()
         self.ai = None
+        self.app = Flask(__name__)
+        CORS(self.app)
+        self.setup_api_routes()
+        self.setup_html_route()
 
     def download_model(self, model_number):
         if model_number not in self.cfg.supported_models:
@@ -167,50 +182,18 @@ class Silentis:
         if available_ram < required_ram:
             raise RuntimeError(f"Insufficient RAM: {model_info['name']} requires {required_ram}GB, only {available_ram:.1f}GB available")
 
-    def update_model_settings(self):
-        print("\n--- Update Model Settings ---")
-        print(f"Current settings: Temp={self.config['model_params']['temp']}, "
-              f"Max Tokens={self.config['model_params']['max_tokens']}, "
-              f"Top-P={self.config['model_params']['top_p']}, "
-              f"GPU={'Enabled' if self.config['use_gpu'] else 'Disabled'}, "
-              f"Show Welcome={'Enabled' if self.config['show_welcome'] else 'Disabled'}, "
-              f"Disable Model Selection={'Enabled' if self.config['disable_model_selection'] else 'Disabled'}")
-        try:
-            temp = self._get_valid_input("Enter Temperature (0-1, default 0.7): ", float, 0.0, 1.0)
-            max_tokens = self._get_valid_input("Enter Max Tokens (1-1000, default 50): ", int, 1, 1000)
-            top_p = self._get_valid_input("Enter Top-P (0-1, default 0.9): ", float, 0.0, 1.0)
-            use_gpu = input("Enable GPU? (y/n, default No): ").lower() in ['y', 'yes']
-            show_welcome = input("Show Welcome Message? (y/n, default Yes): ").lower() not in ['n', 'no']
-            disable_model_selection = input("Disable Model Selection? (y/n, default No): ").lower() in ['y', 'yes']
-
-            if disable_model_selection:
-                # Prompt user to select a default model
-                print("Please select a default model:")
-                self._show_model_list()
-                default_model = input("Enter the number of the default model: ").strip()
-                if default_model.isdigit() and int(default_model) in self.cfg.supported_models:
-                    self.config['selected_model'] = int(default_model)
-                    print(f"Default model set to: {self.cfg.supported_models[int(default_model)]['name']}")
-                else:
-                    print("Invalid model number. Disabling model selection has been canceled.")
-                    disable_model_selection = False
-
-            self.config['model_params']['temp'] = temp
-            self.config['model_params']['max_tokens'] = max_tokens
-            self.config['model_params']['top_p'] = top_p
-            self.config['use_gpu'] = use_gpu
-            self.config['show_welcome'] = show_welcome
-            self.config['disable_model_selection'] = disable_model_selection  # Save the new setting
-            self.cfg.save_config(self.config)
-            print("Settings updated. Restart model for GPU changes to take effect.")
-        except Exception as e:
-            print(f"Error updating settings: {str(e)}")
-
     def _get_valid_input(self, prompt, input_type, min_val=None, max_val=None):
         while True:
             value = input(prompt)
             if not value:
-                return self.config['model_params'].get(prompt.split(' ')[1].lower(), None)
+                if 'Temperature' in prompt:
+                    return self.config['model_params']['temp']
+                elif 'Max Tokens' in prompt:
+                    return self.config['model_params']['max_tokens']
+                elif 'Top-P' in prompt:
+                    return self.config['model_params']['top_p']
+                elif 'Port' in prompt:
+                    return self.config['api_port']
             try:
                 num = input_type(value)
                 if (min_val is None or num >= min_val) and (max_val is None or num <= max_val):
@@ -229,7 +212,7 @@ class Silentis:
         """)
         print("Silentis AI - Python Plugin")
         print("Developed by: Silentis Team")
-        print("MIT License | Version 1.0")
+        print("MIT License | Version 1.2.3")
         print("-------------------------------------------")
         print("Documentation: https://silentis.ai/")
         print("Website: https://silentis.ai")
@@ -240,38 +223,6 @@ class Silentis:
         print("===========================================")
         print("Support our mission: https://springboard.pancakeswap.finance/bsc/token/0x8a87562947422db0eb3070a5a1ac773c7a8d64e7")
         print("===========================================")
-
-    def run(self):
-        if self.config.get('show_welcome', True):  # Only show if enabled
-            self._show_welcome()
-
-        if self.config.get('disable_model_selection', False):
-            # Skip model selection and load the default model
-            if self.config.get('selected_model') is None:
-                print("No default model selected. Please select a model first.")
-                self.config['disable_model_selection'] = False
-                self.cfg.save_config(self.config)
-            else:
-                self.load_model()
-                if self.ai:
-                    self.start_chat()
-        else:
-            while True:
-                self._show_model_list()
-                print("10: Configure model settings")
-                print("0: Exit")
-                choice = input("Enter your choice: ").strip()
-                if choice == '0':
-                    print("Exiting Silentis AI...")
-                    break
-                elif choice == '10':
-                    self.update_model_settings()
-                elif choice in ['1', '2', '3', '4']:
-                    self.load_model(int(choice))
-                    if self.ai:
-                        self.start_chat()
-                else:
-                    print("Invalid choice. Please try again.")
 
     def _show_model_list(self):
         print("\n--- Available Models ---")
@@ -288,6 +239,9 @@ class Silentis:
             print(f"[{num}] {info['name']} ({ram}GB RAM) - {desc}")
 
     def start_chat(self):
+        if not self.ai:
+            print("No model loaded. Please load a model from Settings first.")
+            return
         print("\n--- Chat Started ---")
         print("Type 'quit' to return to main menu.")
         while True:
@@ -305,6 +259,176 @@ class Silentis:
                 sys.stdout.write("\r" + " " * 20 + "\r")
                 print(f"Error: {str(e)}")
 
+    def settings_menu(self):
+        while True:
+            print("\n--- Settings Menu ---")
+            print("1: Load Model")
+            print("2: Update Model Parameters")
+            print("0: Back to Main Menu")
+            choice = input("Enter your choice: ").strip()
+            if choice == '0':
+                break
+            elif choice == '1':
+                self._show_model_list()
+                model_choice = input("Enter the number of the model to load (or 'back' to return): ").strip()
+                if model_choice.lower() == 'back':
+                    continue
+                if model_choice in ['1', '2', '3', '4']:
+                    self.load_model(int(model_choice))
+                else:
+                    print("Invalid choice. Please try again.")
+            elif choice == '2':
+                print("\n--- Update Model Parameters ---")
+                print(f"Current settings: Temp={self.config['model_params']['temp']}, "
+                      f"Max Tokens={self.config['model_params']['max_tokens']}, "
+                      f"Top-P={self.config['model_params']['top_p']}, "
+                      f"GPU={'Enabled' if self.config['use_gpu'] else 'Disabled'}, "
+                      f"Show Welcome={'Enabled' if self.config['show_welcome'] else 'Disabled'}, "
+                      f"Disable Model Selection={'Enabled' if self.config['disable_model_selection'] else 'Disabled'}, "
+                      f"API={'Enabled' if self.config['api_enabled'] else 'Disabled'}, "
+                      f"API Host={self.config['api_host']}, "
+                      f"API Port={self.config['api_port']}, "
+                      f"Instructions='{self.config['instructions']}'")
+                try:
+                    temp = self._get_valid_input("Enter Temperature (0-1, default 0.7): ", float, 0.0, 1.0)
+                    max_tokens = self._get_valid_input("Enter Max Tokens (1-1000, default 50): ", int, 1, 1000)
+                    top_p = self._get_valid_input("Enter Top-P (0-1, default 0.9): ", float, 0.0, 1.0)
+                    use_gpu = input("Enable GPU? (y/n, default No): ").lower() in ['y', 'yes']
+                    show_welcome = input("Show Welcome Message? (y/n, default Yes): ").lower() not in ['n', 'no']
+                    disable_model_selection = input("Disable Model Selection? (y/n, default No): ").lower() in ['y', 'yes']
+                    api_enabled = input("Enable API? (y/n, default No): ").lower() in ['y', 'yes']
+                    api_host = input(f"API Host (default {self.config['api_host']}): ") or self.config['api_host']
+                    api_port = self._get_valid_input(f"API Port (1-65535, default {self.config['api_port']}): ", int, 1, 65535)
+                    instructions = input("Enter Instructions (or press Enter to keep current): ") or self.config['instructions']
+
+                    if disable_model_selection and not self.config['selected_model']:
+                        print("Please select a default model:")
+                        self._show_model_list()
+                        default_model = input("Enter the number of the default model: ").strip()
+                        if default_model.isdigit() and int(default_model) in self.cfg.supported_models:
+                            self.config['selected_model'] = int(default_model)
+                            print(f"Default model set to: {self.cfg.supported_models[int(default_model)]['name']}")
+                        else:
+                            print("Invalid model number. Disabling model selection has been canceled.")
+                            disable_model_selection = False
+
+                    self.config['model_params']['temp'] = temp
+                    self.config['model_params']['max_tokens'] = max_tokens
+                    self.config['model_params']['top_p'] = top_p
+                    self.config['use_gpu'] = use_gpu
+                    self.config['show_welcome'] = show_welcome
+                    self.config['disable_model_selection'] = disable_model_selection
+                    self.config['api_enabled'] = api_enabled
+                    self.config['api_host'] = api_host
+                    self.config['api_port'] = api_port
+                    self.config['instructions'] = instructions
+                    self.cfg.save_config(self.config)
+                    if self.ai:
+                        self.ai.config = self.config
+                        self.ai.update_system_prompt()
+                    print("Settings updated. Restart model for GPU changes to take effect.")
+                except Exception as e:
+                    print(f"Error updating settings: {str(e)}")
+            else:
+                print("Invalid choice. Please try again.")
+
+    def setup_api_routes(self):
+        @self.app.route('/api/models', methods=['GET'])
+        def get_models():
+            return jsonify(self.cfg.supported_models)
+
+        @self.app.route('/api/load_model', methods=['POST'])
+        def load_model_route():
+            data = request.get_json()
+            if not data or 'model_number' not in data:
+                return jsonify({'error': 'Model number required'}), 400
+            model_number = int(data['model_number'])
+            if model_number not in self.cfg.supported_models:
+                return jsonify({'error': 'Invalid model number'}), 400
+            self.load_model(model_number)
+            if self.ai:
+                return jsonify({'message': f"Loaded {self.cfg.supported_models[model_number]['name']} successfully"})
+            return jsonify({'error': 'Failed to load model'}), 500
+
+        @self.app.route('/api/chat', methods=['POST'])
+        def chat():
+            if not self.ai:
+                return jsonify({'error': 'No model loaded'}), 400
+            data = request.get_json()
+            if not data or 'prompt' not in data:
+                return jsonify({'error': 'Prompt required'}), 400
+            try:
+                response = self.ai.generate_response(data['prompt'])
+                return jsonify({'response': response})
+            except Exception as e:
+                return jsonify({'error': str(e)}), 500
+
+        @self.app.route('/api/config', methods=['GET'])
+        def get_config():
+            return jsonify(self.config)
+
+        @self.app.route('/api/config', methods=['POST'])
+        def update_config():
+            data = request.get_json()
+            if not data:
+                return jsonify({'error': 'Config data required'}), 400
+            self.config.update(data)
+            if self.cfg.save_config(self.config):
+                if self.ai:
+                    self.ai.config = self.config
+                    self.ai.update_system_prompt()
+                return jsonify({'message': 'Config updated successfully'})
+            return jsonify({'error': 'Failed to save config'}), 500
+
+        @self.app.route('/api/status', methods=['GET'])
+        def status():
+            return jsonify({
+                'model_loaded': bool(self.ai),
+                'selected_model': self.config.get('selected_model'),
+                'available_ram': psutil.virtual_memory().available / (1024 ** 3)
+            })
+
+    def setup_html_route(self):
+        @self.app.route('/')
+        def serve_html():
+            return send_from_directory(self.cfg.app_path, 'silentis.html')
+
+    def start_api(self):
+        if self.config['api_enabled']:
+            print(f"Starting API server on {self.config['api_host']}:{self.config['api_port']}")
+            threading.Thread(
+                target=self.app.run,
+                args=(self.config['api_host'], self.config['api_port']),
+                kwargs={'threaded': True},
+                daemon=True
+            ).start()
+
+    def run(self):
+        if self.config.get('show_welcome', True):
+            self._show_welcome()
+        
+        self.start_api()
+
+        if self.config.get('disable_model_selection', False) and self.config.get('selected_model'):
+            self.load_model()
+            if self.ai:
+                self.start_chat()
+        else:
+            while True:
+                print("\n--- Main Menu ---")
+                print("1: Chat")
+                print("2: Settings")
+                print("0: Exit")
+                choice = input("Enter your choice: ").strip()
+                if choice == '0':
+                    print("Exiting Silentis AI...")
+                    break
+                elif choice == '1':
+                    self.start_chat()
+                elif choice == '2':
+                    self.settings_menu()
+                else:
+                    print("Invalid choice. Please try again.")
 
 if __name__ == "__main__":
     plugin = Silentis()
