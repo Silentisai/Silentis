@@ -5,7 +5,7 @@
 </p>
 
 **Silentis Open-Source Core Python Plugin**  
-**MIT License | Plugin Version 1.2.2**  
+**MIT License | Plugin Version 1.2.3**  
 
 A flexible AI plugin system for interacting with multiple large language models, featuring:  
 ✅ **Multi-model support** (Reasoner, Llama, DeepSeek, Phi-3)  
